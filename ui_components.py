@@ -124,27 +124,43 @@ class SliderControlWidget(QtWidgets.QWidget):
     @value.setter
     def value(self, val):
         self.__value = clamp(val, self.__span[0], self.__span[1])
-        self.__blockSignals()
-        self._double_spinBox.setValue(self.__value)
+        self.__block_signals()
+        self._spinbox.setValue(self.__value)
         self._slider.setValue(self.__value)
-        self.__blockSignals(False)
+        self.__block_signals(False)
 
 
 class PositionControl(QtWidgets.QWidget):
-    def __init__(self, label):
+    def __init__(self, label, span=(0, 1), single_step=0.1, value=0):
         super().__init__()
 
         layout = QtWidgets.QVBoxLayout()
-        self._slider = SliderControlWidget(span=(0, 1), single_step=0.1)
         self._checkbox = QtWidgets.QCheckBox(text=label)
+        self._checkbox.setChecked(False)
+        self._checkbox.stateChanged.connect(self.on_check_changed)
+
+        self._slider = SliderControlWidget(span=span, value=value, single_step=single_step)
+        self._slider.setEnabled(False)
 
         layout.addWidget(self._checkbox)
         layout.addWidget(self._slider)
         self.setLayout(layout)
 
+        self.__default_value = value
+
     @property
     def value(self):
-        return self._slider.value
+        if self._checkbox.isChecked():
+            return self._slider.value
+        else:
+            return self.__default_value
+
+    def on_check_changed(self):
+        enable = self._checkbox.isChecked()
+        self._slider.setEnabled(enable)
+        if ~enable:
+            self._slider.value = self.__default_value
+
 
 class Button(QtWidgets.QPushButton):
     def __init__(self, label="Button", enabled=True, parent=None):

@@ -124,9 +124,9 @@ class PlantAlong(QtWidgets.QGroupBox):
         super().__init__()
 
         layout = QtWidgets.QVBoxLayout()
-        self.per_step = UI.PositionControl(label='Set Plant Step(%d)')
+        self.per_step = UI.PositionControl(label='Set Plant Step(%d)', value=0.1)
         self.start_pos = UI.PositionControl(label='Set Start Position(%d)')
-        self.end_pos = UI.PositionControl(label='Set End Position(%d)')
+        self.end_pos = UI.PositionControl(label='Set End Position(%d)', value=1)
 
         layout.addWidget(self.per_step)
         layout.addWidget(self.start_pos)
