@@ -78,12 +78,11 @@ class Vector3Control(QtWidgets.QWidget):
             parent.addWidget(self)
 
 
-class SliderControl(QtWidgets.QGroupBox):
+class SliderControlWidget(QtWidgets.QWidget):
     value_change = Signal(float)
 
-    def __init__(self, label=None, span=(0, 10), value=0, single_step=1, parent=None):
+    def __init__(self,  span=(0, 10), value=0, single_step=1, parent=None):
         super().__init__()
-
         layout = QtWidgets.QHBoxLayout()
 
         self._slider = QtWidgets.QSlider(QtCore.Qt.Horizontal,
@@ -96,10 +95,7 @@ class SliderControl(QtWidgets.QGroupBox):
         layout.addWidget(self._slider)
         layout.addWidget(self._spinbox)
 
-        self.setTitle("{0}:" .format(label))
         self.setLayout(layout)
-        self.setStyleSheet("QGroupBox  {color: #a2ec13}")
-
 
         self.__value = value
         self.__span = span
@@ -133,6 +129,22 @@ class SliderControl(QtWidgets.QGroupBox):
         self._slider.setValue(self.__value)
         self.__blockSignals(False)
 
+
+class PositionControl(QtWidgets.QWidget):
+    def __init__(self, label):
+        super().__init__()
+
+        layout = QtWidgets.QVBoxLayout()
+        self._slider = SliderControlWidget(span=(0, 1), single_step=0.1)
+        self._checkbox = QtWidgets.QCheckBox(text=label)
+
+        layout.addWidget(self._checkbox)
+        layout.addWidget(self._slider)
+        self.setLayout(layout)
+
+    @property
+    def value(self):
+        return self._slider.value
 
 class Button(QtWidgets.QPushButton):
     def __init__(self, label="Button", enabled=True, parent=None):

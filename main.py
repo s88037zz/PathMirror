@@ -126,54 +126,7 @@ def apply():
     # for idx, obj in enumerate(objs):
     #     print("obj: %s" % obj.GetName())
 
-    objs = RLPy.RScene.GetSelectedObjects()
-    obj = objs[0]
-    path_pos_control = obj.GetControl("PathPosition")
-    path_pos_control.SetValue(RLPy.RTime(50), 0.25)
-    path_pos_control.SetValue(RLPy.RTime(100), 0.5)
-    path_pos_control.SetValue(RLPy.RTime(150), 0.75)
-    path_pos_control.SetValue(RLPy.RTime(200), 1)
-    obj.Update()
 
-    #
-    # # for plant along
-    # objs = RLPy.RScene.GetSelectedObjects()
-    # single_step = ui['plant_along'].value
-    # print("ui['plant_along'].value: %.2f" % single_step)
-    #
-    # objs = RLPy.RScene.GetSelectedObjects()
-    # try:
-    #     obj = objs[0]
-    #     path_pos_control = obj.GetControl("PathPosition")
-    #     current_time = RLPy.RGlobal.GetTime()
-    #
-    #     # get transform control and origin transform
-    #     transform_control = obj.GetControl("Transform")
-    #     transform_key = RLPy.RTransformKey()
-    #     transform_control.GetTransformKey(current_time, transform_key)
-    #     origin_transform = transform_key.GetTransform()
-    #
-    #     i = 0
-    #     while i <= 1:
-    #         print("i: %.2f" % i)
-    #         # set path position key
-    #         path_pos_control.SetValue(current_time, i)
-    #         obj.Update()
-    #
-    #         # get x, y, z
-    #         transform = transform_key.GetTransform()
-    #
-    #         # let clone transform equal to origin
-    #         clone = obj.Clone()
-    #         clone_transform_control = clone.GetControl("Transform")
-    #         clone_transform_key = RLPy.RTransformKey()
-    #         clone_transform_control.GetTransformKey(current_time, clone_transform_key)
-    #         clone_transform_key.SetTransform(transform)
-    #
-    #         i += single_step
-    #
-    #     print("Finish path control value apply")
-    #     # clean origin obj path position key
-    #     transform_key.SetTransform(origin_transform)
-    # except Exception as e:
-    #     print(e)
+
+    # plant object along the path
+    ui["plant_along"].apply()
