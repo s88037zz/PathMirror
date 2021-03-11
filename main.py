@@ -3,7 +3,7 @@ import ui_components as UI
 from PySide2 import QtWidgets
 from PySide2.shiboken2 import wrapInstance
 from random import randrange
-from path_mirror_control import PathMirrorTabWidget, MirrorAxis, PlantAlong
+from path_mirror_control import Position, ObjectsManageWidget, Arrangement, Path
 from manipulation import local_move
 # Global value
 ui = {}
@@ -15,14 +15,21 @@ event_callback = None
 
 
 # ----------------- Event Call Back -----
-class PropPlanterEventCallBack(RLPy.REventCallback):
+class PlantAlongEventCallBack(RLPy.REventCallback):
     def __init__(self):
         RLPy.REventCallback.__init__(self)
 
     def OnObjectSelectionChanged(self):
         print('selected change')
         global ui
-        ui['tab_widget'].handle_selected_change_event()
+        ui['object_container'].refresh()
+        # ui['plant_along'].handle_selected_change_event()
+        ui['path'].refresh()
+
+    def OnObjectDataChanged(self):
+        ui['object_tree'].refresh()
+        ui['path'].refresh()
+
 
 
 class DialogEventCallback(RLPy.RDialogCallback):
@@ -38,7 +45,7 @@ class DialogEventCallback(RLPy.RDialogCallback):
 
 def regist_event():
     global event_callback
-    event_callback = PropPlanterEventCallBack()
+    event_callback = PlantAlongEventCallBack()
     id = RLPy.REventHandler.RegisterCallback(event_callback)
     event_list.append(id)
 
@@ -55,15 +62,17 @@ def init_dialog():
     ui['dialog_window'], ui['main_layout'] = set_dock("Prop Planter")
 
     try:
-        # tab ui
-        ui['tab_widget'] = PathMirrorTabWidget()
-        ui['main_layout'].addWidget(ui['tab_widget'])
+        ui["object_container"] = ObjectsManageWidget()
+        ui['main_layout'].addWidget(ui['object_container'])
 
-        ui['mirror_axis'] = MirrorAxis()
-        ui['main_layout'].addWidget(ui['mirror_axis'])
+        ui["path"] = Path()
+        ui['main_layout'].addWidget(ui['path'])
 
-        ui['plant_along'] = PlantAlong()
-        ui['main_layout'].addWidget(ui['plant_along'])
+        ui['position'] = Position()
+        ui['main_layout'].addWidget(ui['position'])
+
+        ui['arrangement'] = Arrangement()
+        ui['main_layout'].addWidget(ui['arrangement'])
 
         # apply button
         button = UI.Button("apply", parent=ui['main_layout'])
@@ -74,7 +83,7 @@ def init_dialog():
         print(e)
 
 
-def set_dock(title="Path Mirror", width=300, height=400):
+def set_dock(title="PlantAlong", width=300, height=400):
     dock = RLPy.RUi.CreateRDockWidget()
     dock.SetWindowTitle(title)
 
@@ -107,7 +116,7 @@ def initialize_plugin():
         plugin_menu.setObjectName('pysample_menu')
 
     # dialog
-    menu_action = plugin_menu.addAction("PathMirror")
+    menu_action = plugin_menu.addAction("PlantAlong")
     init_dialog()
     menu_action.triggered.connect(show_dialog)
 
@@ -121,12 +130,55 @@ def run_script():
 
 def apply():
     global ui
-    # objs = RLPy.RScene.GetSelectedObjects()
-    #
-    # for idx, obj in enumerate(objs):
-    #     print("obj: %s" % obj.GetName())
+
+    # for plant along
+    single_step = ui["position"].per_step.value
+    start_pos = ui["position"].start_pos.value
+    end_pos = ui["position"].end_pos.value
+    print("ui['plant_along'].value: %.2f" % single_step)
+
+    # get the object list to plant
+    items = ui['object_container'].items
+    objs = [item['c_obj'] for item in items]
+    origin_path_pos = 0
+
+    arrangement = ui['arrangement'].mode
 
 
+    try:
+        obj = objs[0]
+        path_pos_control = obj.GetControl("PathPosition")
+        current_time = RLPy.RGlobal.GetTime()
+        path_pos_control.GetValue(current_time, origin_path_pos)
 
-    # plant object along the path
-    ui["plant_along"].apply()
+        # get transform control and origin transform
+        transform_control = obj.GetControl("Transform")
+        transform_key = RLPy.RTransformKey()
+        transform_control.GetTransformKey(current_time, transform_key)
+        origin_transform = transform_key.GetTransform()
+
+        i = start_pos
+        while i <= end_pos:
+            print("i: %.2f" % i)
+            # set path position key
+            path_pos_control.SetValue(current_time, i)
+            obj.Update()
+
+            # get x, y, z
+            transform = transform_key.GetTransform()
+
+            # let clone transform equal to origin
+            clone = obj.Clone()
+            clone_transform_control = clone.GetControl("Transform")
+            clone_transform_key = RLPy.RTransformKey()
+            clone_transform_control.GetTransformKey(current_time, clone_transform_key)
+            clone_transform_key.SetTransform(transform)
+
+            i += single_step
+
+        print("Finish path control value apply")
+        # reset origin obj path position key
+        path_pos_control.SetValue(current_time, origin_path_pos)
+        transform_key.SetTransform(origin_transform)
+    except Exception as e:
+        print(e)

@@ -37,3 +37,12 @@ def local_move(obj, local_pos):
     RLPy.RGlobal.SetTime(RLPy.RGlobal.GetTime() + RLPy.RTime(1))
     RLPy.RGlobal.SetTime(RLPy.RGlobal.GetTime() - RLPy.RTime(1))
 
+
+def get_bounding_box(obj):
+    maxPoint = RLPy.RVector3()
+    cenPoint = RLPy.RVector3()
+    minPoint = RLPy.RVector3()
+
+    status = obj.GetBounds(maxPoint, cenPoint, minPoint)
+    bounding = maxPoint - cenPoint  # Can also be: cenPoint - minPoint
+    return bounding

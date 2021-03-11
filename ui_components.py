@@ -5,7 +5,6 @@ from PySide2 import QtCore
 from PySide2.QtCore import *
 
 
-
 class SelectionControl(QtWidgets.QWidget):
     def __init__(self, id, label, height=80, parent=None):
         super().__init__()
@@ -121,6 +120,15 @@ class SliderControlWidget(QtWidgets.QWidget):
     def value(self):
         return self.__value
 
+    @property
+    def minimum(self):
+        return self._spinbox.minimum()
+
+    @minimum.setter
+    def minimum(self, value):
+        self._spinbox.setMinimum(value)
+        self._slider.setMinimum(value)
+
     @value.setter
     def value(self, val):
         self.__value = clamp(val, self.__span[0], self.__span[1])
@@ -154,6 +162,18 @@ class PositionControl(QtWidgets.QWidget):
             return self._slider.value
         else:
             return self.__default_value
+    @property
+    def minimum(self):
+        return self._slider.minimum
+
+    @value.setter
+    def value(self, value):
+        self._slider.value = value
+
+    @minimum.setter
+    def minimum(self, value):
+        self._slider.minimum = value
+
 
     def on_check_changed(self):
         enable = self._checkbox.isChecked()
