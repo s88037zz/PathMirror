@@ -2,9 +2,9 @@ import RLPy
 import ui_components as UI
 from PySide2 import QtWidgets
 from PySide2.shiboken2 import wrapInstance
-from random import randrange
-from path_mirror_control import Position, ObjectsManageWidget, Arrangement, Path
-from manipulation import local_move
+from plant_along_control import Position, ObjectsManageWidget, Arrangement, Path
+import random
+
 # Global value
 ui = {}
 
@@ -20,16 +20,18 @@ class PlantAlongEventCallBack(RLPy.REventCallback):
         RLPy.REventCallback.__init__(self)
 
     def OnObjectSelectionChanged(self):
-        print('selected change')
         global ui
         ui['object_container'].refresh()
         # ui['plant_along'].handle_selected_change_event()
         ui['path'].refresh()
 
     def OnObjectDataChanged(self):
-        ui['object_tree'].refresh()
+        ui['object_container'].refresh()
         ui['path'].refresh()
 
+    def OnAfterFileLoaded(self, nFileType):
+        if nFileType == 0:
+            ui['object_container'].clear()
 
 
 class DialogEventCallback(RLPy.RDialogCallback):
@@ -45,6 +47,7 @@ class DialogEventCallback(RLPy.RDialogCallback):
 
 def regist_event():
     global event_callback
+    global event_list
     event_callback = PlantAlongEventCallBack()
     id = RLPy.REventHandler.RegisterCallback(event_callback)
     event_list.append(id)
@@ -130,55 +133,57 @@ def run_script():
 
 def apply():
     global ui
-
+    RLPy.RGlobal.BeginAction("PlantAlong")
     # for plant along
-    single_step = ui["position"].per_step.value
-    start_pos = ui["position"].start_pos.value
-    end_pos = ui["position"].end_pos.value
-    print("ui['plant_along'].value: %.2f" % single_step)
+    start_pos = ui["position"].start_pos
+    end_pos = ui["position"].end_pos
 
     # get the object list to plant
     items = ui['object_container'].items
     objs = [item['c_obj'] for item in items]
-    origin_path_pos = 0
 
+    # get arrrange method
     arrangement = ui['arrangement'].mode
 
+    # get path
+    path_name = ui["path"].current_text
+    path = RLPy.RScene.FindObject(RLPy.EObjectType_Path, path_name)
+    
+    # check
+    if not path:
+        RLPy.RUi.ShowMessageBox("PlantAlong", "Can't find path object you selected", RLPy.EMsgButton_Ok)
+        return
+    if len(objs) == 0:
+        RLPy.RUi.ShowMessageBox("PlantAlong", "Please add the object in list", RLPy.EMsgButton_Ok)
+        return
+    if start_pos > end_pos:
+        RLPy.RUi.ShowMessageBox("PlantAlong", "Start Position can't greater than End Position", RLPy.EMsgButton_Ok)
+        return
 
     try:
-        obj = objs[0]
-        path_pos_control = obj.GetControl("PathPosition")
-        current_time = RLPy.RGlobal.GetTime()
-        path_pos_control.GetValue(current_time, origin_path_pos)
-
-        # get transform control and origin transform
-        transform_control = obj.GetControl("Transform")
-        transform_key = RLPy.RTransformKey()
-        transform_control.GetTransformKey(current_time, transform_key)
-        origin_transform = transform_key.GetTransform()
-
+        idx = 0
         i = start_pos
         while i <= end_pos:
-            print("i: %.2f" % i)
-            # set path position key
+            single_step = ui["position"].step
+
+            if arrangement == "Random":
+                clone = objs[random.randint(0, len(objs)*2) % len(objs)].Clone()
+            elif arrangement == "Sequence":
+                clone = objs[idx % len(objs)].Clone()
+            else:
+                clone = objs[idx % len(objs)].Clone()
+
+            current_time = RLPy.RGlobal.GetTime()
+            clone.FollowPath(path, current_time)
+
+            path_pos_control = clone.GetControl("PathPosition")
+            current_time = RLPy.RGlobal.GetTime()
             path_pos_control.SetValue(current_time, i)
-            obj.Update()
 
-            # get x, y, z
-            transform = transform_key.GetTransform()
-
-            # let clone transform equal to origin
-            clone = obj.Clone()
-            clone_transform_control = clone.GetControl("Transform")
-            clone_transform_key = RLPy.RTransformKey()
-            clone_transform_control.GetTransformKey(current_time, clone_transform_key)
-            clone_transform_key.SetTransform(transform)
-
+            # get clone
             i += single_step
+            idx += 1
 
-        print("Finish path control value apply")
-        # reset origin obj path position key
-        path_pos_control.SetValue(current_time, origin_path_pos)
-        transform_key.SetTransform(origin_transform)
+        RLPy.RGlobal.EndAction()
     except Exception as e:
         print(e)

@@ -80,12 +80,13 @@ class Vector3Control(QtWidgets.QWidget):
 class SliderControlWidget(QtWidgets.QWidget):
     value_change = Signal(float)
 
-    def __init__(self,  span=(0, 10), value=0, single_step=1, parent=None):
+    def __init__(self,  span=(0, 1), value=0, single_step=0.01, parent=None, factor=100):
         super().__init__()
         layout = QtWidgets.QHBoxLayout()
 
         self._slider = QtWidgets.QSlider(QtCore.Qt.Horizontal,
-                                         maximum=span[1], minimum=span[0], value=value, singleStep=single_step)
+                                         maximum=span[1]*factor, minimum=span[0]*factor, value=value)
+        self._slider.setSingleStep(1)
         self._slider.valueChanged.connect(lambda x: self.__change_value(x, 'spinbox'))
 
         self._spinbox = QtWidgets.QDoubleSpinBox(maximum=span[1], minimum=span[0], value=value, singleStep=single_step)
@@ -98,6 +99,8 @@ class SliderControlWidget(QtWidgets.QWidget):
 
         self.__value = value
         self.__span = span
+        self.__factor = factor
+
         if parent:
             parent.addWidget(self)
 
@@ -108,11 +111,11 @@ class SliderControlWidget(QtWidgets.QWidget):
     def __change_value(self, value, item: str):
         self.__block_signals()
         if item == 'spinbox':
-            self.__value = value
-            self._spinbox.setValue(value)
+            self.__value = value / self.__factor
+            self._spinbox.setValue(self.__value)
         elif item == 'slider':
             self.__value = value
-            self._slider.setValue(value)
+            self._slider.setValue(value * self.__factor)
         self.__block_signals(False)
         self.value_change.emit(self.__value)
 
@@ -127,30 +130,30 @@ class SliderControlWidget(QtWidgets.QWidget):
     @minimum.setter
     def minimum(self, value):
         self._spinbox.setMinimum(value)
-        self._slider.setMinimum(value)
+        self._slider.setMinimum(value * self.__factor)
 
     @value.setter
     def value(self, val):
         self.__value = clamp(val, self.__span[0], self.__span[1])
         self.__block_signals()
         self._spinbox.setValue(self.__value)
-        self._slider.setValue(self.__value)
+        self._slider.setValue(self.__value * self.__factor)
         self.__block_signals(False)
 
 
 class PositionControl(QtWidgets.QWidget):
-    def __init__(self, label, span=(0, 1), single_step=0.1, value=0):
+    def __init__(self, label, span=(0, 1), single_step=0.01, value=0, state=True):
         super().__init__()
 
         layout = QtWidgets.QVBoxLayout()
-        self._checkbox = QtWidgets.QCheckBox(text=label)
-        self._checkbox.setChecked(False)
-        self._checkbox.stateChanged.connect(self.on_check_changed)
+        self.checkbox = QtWidgets.QCheckBox(text=label)
+        self.checkbox.setChecked(state)
+        self.checkbox.stateChanged.connect(self.on_check_changed)
 
         self._slider = SliderControlWidget(span=span, value=value, single_step=single_step)
-        self._slider.setEnabled(False)
+        self._slider.setEnabled(state)
 
-        layout.addWidget(self._checkbox)
+        layout.addWidget(self.checkbox)
         layout.addWidget(self._slider)
         self.setLayout(layout)
 
@@ -158,7 +161,7 @@ class PositionControl(QtWidgets.QWidget):
 
     @property
     def value(self):
-        if self._checkbox.isChecked():
+        if self.checkbox.isChecked():
             return self._slider.value
         else:
             return self.__default_value
@@ -174,9 +177,8 @@ class PositionControl(QtWidgets.QWidget):
     def minimum(self, value):
         self._slider.minimum = value
 
-
     def on_check_changed(self):
-        enable = self._checkbox.isChecked()
+        enable = self.checkbox.isChecked()
         self._slider.setEnabled(enable)
         if ~enable:
             self._slider.value = self.__default_value

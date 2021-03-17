@@ -1,9 +1,7 @@
 import RLPy
 from PySide2 import QtWidgets
-from PySide2.shiboken2 import wrapInstance
-from PySide2 import QtCore
 import ui_components as UI
-import manipulation as mp
+from random import randint
 
 
 class ObjectsManageWidget(QtWidgets.QWidget):
@@ -12,22 +10,17 @@ class ObjectsManageWidget(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout()
         contain_btn_layout = QtWidgets.QHBoxLayout()
         contain_list_layout = QtWidgets.QHBoxLayout()
-        # self._contain_widget = QtWidgets.QTreeWidget()
-        # self._tree_widget.setDragDropMode(QtWidgets.QAbstractItemView.InternalMove)
-        # self._tree_widget.setDragEnabled(True)
-        # self._tree_widget.setDropIndicatorShown(True)
 
         self._contain_widget = QtWidgets.QListWidget()
         self._contain_widget.setAcceptDrops(True)
         self._contain_widget.setDragEnabled(True)
+        self._contain_widget.model().rowsMoved.connect(self.refresh_switch_items)
         self._contain_widget.setDragDropMode(QtWidgets.QAbstractItemView.InternalMove)
 
         self._add_btn = QtWidgets.QPushButton(text='add')
-        # self._add_btn.setFixedHeight(15)
         self._add_btn.clicked.connect(self.__add_click)
 
         self._remove_btn = QtWidgets.QPushButton(text='remove')
-        # self._remove_btn.setFixedHeight(15)
         self._remove_btn.clicked.connect(self.__remove_click)
 
         contain_btn_layout.addWidget(self._add_btn)
@@ -41,13 +34,6 @@ class ObjectsManageWidget(QtWidgets.QWidget):
         self.__items = []
 
     def __add_item(self, c_obj):
-
-        # name = c_obj.GetName()
-        # item = QtWidgets.QTreeWidgetItem()
-        # item.setText(0, name)
-        # item.setFlags(item.flags() | QtCore.Qt.NoItemFlags)
-        # item.setFlags(item.flags() | QtCore.Qt.ItemIsEditable)
-        # self._contain_widget.addTopLevelItem(item)
 
         name = c_obj.GetName()
         item = QtWidgets.QListWidgetItem()
@@ -65,17 +51,14 @@ class ObjectsManageWidget(QtWidgets.QWidget):
             self.__add_item(c_obj)
 
     def __remove_item(self, value, key):
-        for item_dict in self.__items:
+        for idx, item_dict in enumerate(self.__items):
             if item_dict[key] is value:
-                self.__items.remove(item_dict)
+                self.__items.pop(idx)
                 idx = self._contain_widget.row(item_dict['item'])
                 self._contain_widget.takeItem(idx)
-            else:
-                print(item_dict[key], value)
 
     def __remove_click(self):
         selected_items = self._contain_widget.selectedItems()
-        print("selected quantity: %d" % len(selected_items))
         for item in selected_items:
             self.__remove_item(item, 'item')
 
@@ -85,7 +68,6 @@ class ObjectsManageWidget(QtWidgets.QWidget):
                 name = obj.GetName()
                 # item_dict['item'].setText(0, name)
                 item_dict['item'].setText(name)
-
 
     def refresh(self):
         c_objs = RLPy.RScene.FindObjects(RLPy.EObjectType_Object |
@@ -102,13 +84,43 @@ class ObjectsManageWidget(QtWidgets.QWidget):
                 self.__update_name(obj)
 
         for obj in w_objs:
-            if obj not in w_objs:
+            if obj not in c_objs:
                 self.__remove_item(obj, key='c_obj')
 
+    def refresh_switch_items(self):
+        new_items = []
+        for row in range(self._contain_widget.count()):
+            item = self._contain_widget.item(row)
+            item_dict = self.__find_item_by_name(item.text())
+            if item_dict:
+                new_items.append(item_dict)
+        self.__items = new_items
+
+    def clear(self):
+        self._contain_widget.clear()
+        self.__items.clear()
+
+    def __find_item_by_name(self, name):
+        for item in self.__items:
+            if item['c_obj'].GetName() == name:
+                return item
+        return None
 
     @property
     def items(self):
         return self.__items
+
+
+class StepControl(UI.PositionControl):
+    def __init__(self):
+        super().__init__(label='Set Plant Constant Step(%d)', value=0.1)
+
+    @property
+    def value(self):
+        if self.checkbox.checkState():
+            return self.slider.value
+        else:
+            return randint(0, 10) / 100
 
 
 class Position(QtWidgets.QGroupBox):
@@ -116,84 +128,35 @@ class Position(QtWidgets.QGroupBox):
         super().__init__()
 
         layout = QtWidgets.QVBoxLayout()
-        self.per_step = UI.PositionControl(label='Set Plant Step(%d)', value=0.1)
-        self.start_pos = UI.PositionControl(label='Set Start Position(%d)')
-        self.end_pos = UI.PositionControl(label='Set End Position(%d)', value=1)
-        self.note_label = QtWidgets.QLabel(text="Step have to greater than %.2f" % 0.1)
+        
+        self.step_control = StepControl()
+        
+        self.start_pos_control = UI.PositionControl(label='Set Start Position(%d)')
 
-        layout.addWidget(self.per_step)
-        layout.addWidget(self.start_pos)
-        layout.addWidget(self.end_pos)
-        layout.addWidget(self.note_label)
+        self.end_pos_control = UI.PositionControl(label='Set End Position(%d)', value=1)
+
+        layout.addWidget(self.step_control)
+        layout.addWidget(self.start_pos_control)
+        layout.addWidget(self.end_pos_control)
         self.setLayout(layout)
 
         self.setTitle("PlantAlong")
         self.setStyleSheet("QGroupBox  {color: #a2ec13}")
 
-        self.__mini_step = 0.1
-
         if parent:
             parent.addWidget(self)
 
-    def apply(self,):
-        # for plant along
-        single_step = self.per_step.value
-        start_pos = self.start_pos.value
-        end_pos = self.end_pos.value
-        print("ui['plant_along'].value: %.2f" % single_step)
-        
-        # get the object list to plant
-        objs = RLPy.RScene.GetSelectedObjects()
-        origin_path_pos = 0
+    @property
+    def step(self):
+        return self.step_control.value
 
-        try:
-            obj = objs[0]
-            path_pos_control = obj.GetControl("PathPosition")
-            current_time = RLPy.RGlobal.GetTime()
-            path_pos_control.GetValue(current_time, origin_path_pos)
+    @property
+    def start_pos(self):
+        return self.start_pos_control.value
 
-            # get transform control and origin transform
-            transform_control = obj.GetControl("Transform")
-            transform_key = RLPy.RTransformKey()
-            transform_control.GetTransformKey(current_time, transform_key)
-            origin_transform = transform_key.GetTransform()
-
-
-            i = start_pos
-            while i <= end_pos:
-                print("i: %.2f" % i)
-                # set path position key
-                path_pos_control.SetValue(current_time, i)
-                obj.Update()
-
-                # get x, y, z
-                transform = transform_key.GetTransform()
-
-                # let clone transform equal to origin
-                clone = obj.Clone()
-                clone_transform_control = clone.GetControl("Transform")
-                clone_transform_key = RLPy.RTransformKey()
-                clone_transform_control.GetTransformKey(current_time, clone_transform_key)
-                clone_transform_key.SetTransform(transform)
-
-                i += single_step
-
-            print("Finish path control value apply")
-            # reset origin obj path position key
-            path_pos_control.SetValue(current_time, origin_path_pos)
-            transform_key.SetTransform(origin_transform)
-        except Exception as e:
-            print(e)
-
-    # def handle_selected_change_event(self):
-    #     objs = RLPy.RScene_GetSelectedObjects()
-    #     if objs:
-    #         bounding = mp.get_bounding_box(objs[0])
-    #         self.__mini_step = bounding[1]
-    #         self.note_label.setText("Step have to greater than %.2f" % self.__mini_step)
-    #         # set control paras
-    #         self.per_step.minimum = self.__mini_step
-    #         self.per_step.value = self.__mini_step
+    @property
+    def end_pos(self):
+        return self.end_pos_control.value
 
 
 class Arrangement(QtWidgets.QGroupBox):
@@ -230,9 +193,6 @@ class Path(QtWidgets.QGroupBox):
         self._path_list = QtWidgets.QComboBox()
         self.__update_list()
 
-        self._path_label = QtWidgets.QLabel("Path")
-
-        path_layout.addWidget(self._path_label)
         path_layout.addWidget(self._path_list)
         layout.addLayout(path_layout)
 
@@ -244,6 +204,10 @@ class Path(QtWidgets.QGroupBox):
 
     def __update_list(self):
         self._path_list.clear()
-        objs = RLPy.RScene.FindObjects(RLPy.EObjectType_Prop)
+        objs = RLPy.RScene.FindObjects(RLPy.EObjectType_Path)
         for idx, obj in enumerate(objs):
             self._path_list.insertItem(idx, obj.GetName())
+
+    @property
+    def current_text(self):
+        return self._path_list.currentText()
