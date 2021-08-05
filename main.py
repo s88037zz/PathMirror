@@ -26,10 +26,12 @@ class PlantAlongEventCallBack(RLPy.REventCallback):
         ui['path'].refresh()
 
     def OnObjectDataChanged(self):
+        global ui
         ui['object_container'].refresh()
         ui['path'].refresh()
 
     def OnAfterFileLoaded(self, nFileType):
+        global ui
         if nFileType == 0:
             ui['object_container'].clear()
 
@@ -37,25 +39,39 @@ class PlantAlongEventCallBack(RLPy.REventCallback):
 class DialogEventCallback(RLPy.RDialogCallback):
     def __init__(self):
         RLPy.RDialogCallback.__init__(self)
+        self.show_event_fptr = None
+        self.hide_event_fptr = None
+
+    def OnDialogShow(self):
+        if self.show_event_fptr != None:
+            self.show_event_fptr()
 
     def OnDialogHide(self):
-        global event_list
-        for event in event_list:
-            RLPy.REventHandler.UnregisterCallback(event)
-        event_list.clear()
+        if self.hide_event_fptr != None:
+            return self.hide_event_fptr()
+        else:
+            return True
+
+    def register_show_event_callback(self, show_function):
+        self.show_event_fptr = show_function
+
+    def register_hide_event_callback(self, hide_function):
+        self.hide_event_fptr = hide_function
 
 
-def regist_event():
+def register_event():
     global event_callback
     global event_list
     event_callback = PlantAlongEventCallBack()
     id = RLPy.REventHandler.RegisterCallback(event_callback)
     event_list.append(id)
 
-    global ui
-    global dialog_event_callback
-    dialog_event_callback = DialogEventCallback()
-    ui['dialog_window'].RegisterEventCallback(dialog_event_callback)
+
+def unregister_event():
+    global event_list
+    for evt in event_list:
+        RLPy.REventHandler.UnregisterCallback(evt)
+    event_list = []
 
 
 # ----- Set Plugin -------
@@ -105,7 +121,7 @@ def set_dock(title="PlantAlong", width=300, height=400):
 def show_dialog():
     global ui
     ui["dialog_window"].Show()
-    regist_event()
+    register_event()
 
 
 def initialize_plugin():
@@ -121,7 +137,22 @@ def initialize_plugin():
     # dialog
     menu_action = plugin_menu.addAction("PlantAlong")
     init_dialog()
+    global ui
+    global dialog_event_callback
+    dialog_event_callback = DialogEventCallback()
+    dialog_event_callback.register_show_event_callback(on_show_main_dlg)
+    dialog_event_callback.register_hide_event_callback(on_close_main_dlg)
+    ui['dialog_window'].RegisterEventCallback(dialog_event_callback)
+
     menu_action.triggered.connect(show_dialog)
+
+
+def on_show_main_dlg():
+    register_event()
+
+
+def on_close_main_dlg():
+    unregister_event()
 
 
 def run_script():
